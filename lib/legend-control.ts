@@ -8,6 +8,7 @@ export type LegendOptions = {
     showCheckbox: boolean;
     reverseOrder: boolean;
     onlyRendered: boolean;
+    zoomOnClick?: boolean;
     accesstoken?: string;
 }
 
@@ -17,6 +18,7 @@ export type LegendOptions = {
  * @param {boolean} options.showDefault true: it shows legend as default. false: legend will be closed as default
  * @param {boolean} options.showCheckbox true: checkbox will be added for switching layer's visibility. false: checkbox will not be added.
  * @param {boolean} options.reverseOrder true: layers will be ordered from top. false: layers will be ordered from bottom. If not specified, default value will be true.
+ * @param {boolean} options.zoomOnClick true: zoom to layer bbox on click. false: legend stays unresponsive to clicks on click
  * @param {boolean} options.onlyRendered true: only rendered layers will be shown on legend as default. false: all layers' legend will be shown as default. If not specified, default value will be true.
  */
 
@@ -38,6 +40,7 @@ export default class MapboxLegendControl implements IControl
         reverseOrder: true,
         onlyRendered: true,
         accesstoken: undefined,
+        zoomOnClick: true,
     };
     private sprite = {
         image: HTMLImageElement,
@@ -229,6 +232,15 @@ export default class MapboxLegendControl implements IControl
         td2.className='legend-table-td';
         let label1 = document.createElement('label');
         label1.textContent = (this.targets && this.targets[layer.id])?this.targets[layer.id]:layer.id;
+        if (true) {
+            label1.addEventListener('click', function(){
+                // @ts-ignore
+                const flyCoordinates = map?.getSource(layer.source)?.data?.geometry;
+                map?.flyTo({
+                    center: flyCoordinates,
+                });
+            });
+        }
         td2.appendChild(label1)
 
         // tr.appendChild(td0);
