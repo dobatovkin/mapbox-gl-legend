@@ -40,7 +40,7 @@ export default class MapboxLegendControl implements IControl
         reverseOrder: true,
         onlyRendered: true,
         accesstoken: undefined,
-        zoomOnClick: true,
+        zoomOnClick: false,
     };
     private sprite = {
         image: HTMLImageElement,
@@ -232,13 +232,22 @@ export default class MapboxLegendControl implements IControl
         td2.className='legend-table-td';
         let label1 = document.createElement('label');
         label1.textContent = (this.targets && this.targets[layer.id])?this.targets[layer.id]:layer.id;
-        if (true) {
-            label1.addEventListener('click', function(){
+        if (this.options.zoomOnClick) {
+            label1.addEventListener('dblclick', function(){
                 // @ts-ignore
-                const flyCoordinates = map?.getSource(layer.source)?.data?.geometry;
+                const flyCoordinates = [0,0];
                 map?.flyTo({
-                    center: flyCoordinates,
+                    center: layer.metadata.center,
                 });
+            });
+            label1.addEventListener('click', (e) => {
+                map?.setFeatureState({
+                    source: layer.source,
+                    id: 0,
+                }, {
+                    active: true,
+                })
+                console.log(layer.metadata)
             });
         }
         td2.appendChild(label1)
