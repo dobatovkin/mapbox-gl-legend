@@ -44,7 +44,8 @@ import '../css/styles.css';
             showDefault: false, 
             showCheckbox: false, 
             onlyRendered: true,
-            reverseOrder: true
+            reverseOrder: true,
+            zoomOnClick:true
         }
         map.addControl(new MapboxLegendControl(targets, options), 'top-right');
 
