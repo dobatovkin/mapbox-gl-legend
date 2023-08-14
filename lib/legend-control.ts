@@ -239,16 +239,15 @@ export default class MapboxLegendControl implements IControl
                     center: layer.metadata.center,
                 });
             });
-            label1.addEventListener('click', async (e) => {
-
+            label1.addEventListener('click', async () => {
                 const allSources: any = map?.getStyle().sources;
                 await allSources.forEach((source: any)=>{
-                    if (source.type = 'geojson') {
-                        map?.removeFeatureState({
-                            source: source,
+                     if (source.type = 'geojson') {
+                         map?.removeFeatureState({
+                             source: source,
                         });
                     };
-                });
+                }); 
                 map?.setFeatureState({
                     source: String(layer.source),
                     id: 0,
