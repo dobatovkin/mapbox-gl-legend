@@ -1,12 +1,16 @@
 <!DOCTYPE html>
-<html lang='en'>
+<html>
 
 <head>
-  <meta charset='utf-8' />
-  <title>Create interactive hover effects with Mapbox GL JS</title>
-  <meta name='viewport' content='width=device-width, initial-scale=1' />
-  <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js'></script>
-  <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css' rel='stylesheet' />
+  <meta charset="utf-8">
+  <title>Drag markers</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
+
+  <link href='https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.css' rel='stylesheet' />
+  <script src="https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.js"></script>
   <style>
     body {
       margin: 0;
@@ -20,175 +24,304 @@
       width: 100%;
     }
 
-    .quake-info {
+    #menu {
       position: absolute;
-      font-family: sans-serif;
-      margin-top: 5px;
-      margin-left: 5px;
-      padding: 5px;
-      width: 30%;
-      border: 2px solid black;
-      font-size: 14px;
-      color: #222;
-      background-color: #fff;
+      background: #efefef;
+      padding: 10px;
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    #properties-menu {
+      position: absolute;
+
+    }
+
+    .coordinates {
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      padding: 5px 10px;
+      margin: 0;
+      font-size: 11px;
+      line-height: 18px;
       border-radius: 3px;
+      display: none;
+    }
+
+    .dot {
+      height: 30px;
+      width: 30px;
+      background-color: red;
+      border-radius: 50%;
+      display: inline-block;
     }
   </style>
 </head>
 
 <body>
 
-  <div id='map'></div>
-
-  <div class='quake-info'>
-    <div><strong>Magnitude:</strong> <span id='mag'></span></div>
-    <div><strong>Location:</strong> <span id='loc'></span></div>
-    <div><strong>Date:</strong> <span id='date'></span></div>
+  <div id="map"></div>
+  <div id="menu">
+    <input id="satellite-streets-v12" type="radio" name="rtoggle" value="satellite">
+    <label for="satellite-streets-v12">satellite</label>
+    <input id="streets-v12" type="radio" name="rtoggle" value="streets" checked="checked">
+    <label for="streets-v12">streets</label>
   </div>
 
-  <script>mapboxgl.accessToken = 'pk.eyJ1IjoiZGFiYXRvdWtpbiIsImEiOiJjbGc0NWFocjMwMmI2M3BycWF3cjlxNmc2In0.PxbxqgSkUxxczkcEx0_VEw';
+  <div id="properties-menu"></div>
+
+  <pre id="coordinates" class="coordinates"></pre>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWFuaW5nc2FtYmFsZSIsImEiOiJjamx3YTQya2ExNWdlM3FwM3Z1YWp2bHZrIn0.mk2emL4LkX_uwFPq7nHZsA';
+
+    function filterProperties(raw) {
+      const filtered = Object.keys(raw)
+        .filter((key) => key.startsWith('string'))
+        .reduce((obj, key) => {
+          return {
+            ...obj,
+            [key]: raw[key]
+          };
+        }, {});
+    };
+
+
+    //test markers https://colorbrewer2.org/#type=qualitative&scheme=Accent&n=3 ['#7fc97f','#beaed4','#fdc086']
+    var rpMarker = document.createElement('span');
+    rpMarker.className = "dot";
+
+    var marker1 = new mapboxgl.Marker({
+      draggable: true,
+      color: "#3a59fa"
+    });
+
+    var marker2 = new mapboxgl.Marker({
+      draggable: true,
+      color: "blue",
+      element: rpMarker,
+    });
+
+    var marker3 = new mapboxgl.Marker({
+      draggable: false,
+      color: "gray",
+      scale: 1
+    });
+
+    var marker4 = new mapboxgl.Marker({
+      draggable: false,
+      color: "green",
+      scale: 0.7
+    });
+
+    var marker5 = new mapboxgl.Marker({
+      draggable: false,
+      color: "yellow",
+      scale: 0.7
+    });
+
+    var marker6 = new mapboxgl.Marker({
+      draggable: false,
+      color: "",
+      scale: 0.7
+    });
+
+    function onDragEnd() {
+      const lngLat = marker1.getLngLat();
+      const lngLat2 = marker2.getLngLat();
+      const lngLat3 = marker3.getLngLat();
+      window.Retool.modelUpdate({
+        latitude: lngLat.lat,
+        longitude: lngLat.lng,
+        rp_lat: lngLat2.lat,
+        rp_lon: lngLat2.lng,
+        source_lat: lngLat3.lat,
+        source_lon: lngLat3.lng,
+        debug: map.getStyle(),
+      });
+    }
+
     const map = new mapboxgl.Map({
-      container: 'map', // Specify the container ID
-      style: 'mapbox://styles/mapbox/outdoors-v12', // Specify which map style to use
-      center: [-122.44121, 37.76132], // Specify the starting position [lng, lat]
-      zoom: 3.5 // Specify the starting zoom
+      container: 'map', // container ID
+      style: 'mapbox://styles/mapbox/streets-v12', // style URL
+      //center: [-2.81361, 36.77271], // starting position [lng, lat]
+      zoom: 16, // starting zoom
+      projection: 'mercator',
     });
 
-    const magDisplay = document.getElementById('mag');
-    const locDisplay = document.getElementById('loc');
-    const dateDisplay = document.getElementById('date');
+    const layerList = document.getElementById('menu');
+    const inputs = layerList.getElementsByTagName('input');
 
-    const today = new Date();
-    // Use JavaScript to get the date a week ago
-    const priorDate = new Date().setDate(today.getDate() - 7);
-    // Set that to an ISO8601 timestamp as required by the USGS earthquake API
-    const priorDateTs = new Date(priorDate);
-    const sevenDaysAgo = priorDateTs.toISOString();
+    for (const input of inputs) {
+      input.onclick = (layer) => {
+        const layerId = layer.target.id;
+        map.setStyle('mapbox://styles/mapbox/' + layerId);
+      };
+    }
 
-    map.on('load', () => {
-      map.addSource('earthquakes', {
-        type: 'geojson',
-        data: `https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&eventtype=earthquake&minmagnitude=1&starttime=${sevenDaysAgo}`,
-        generateId: true // This ensures that all features have unique IDs
-      });
+    var rowId;
+    var featureIndex = 0;
+    var addedLayers = [];
+    var legendControl;
 
-      map.addLayer({
-        id: 'earthquakes-viz',
-        type: 'circle',
-        source: 'earthquakes',
-        paint: {
-          // The feature-state dependent circle-radius expression will render
-          // the radius size according to its magnitude when
-          // a feature's hover state is set to true
-          'circle-radius': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            [
-              'interpolate',
-              ['linear'],
-              ['get', 'mag'],
-              1,
-              8,
-              1.5,
-              10,
-              2,
-              12,
-              2.5,
-              14,
-              3,
-              16,
-              3.5,
-              18,
-              4.5,
-              20,
-              6.5,
-              22,
-              8.5,
-              24,
-              10.5,
-              26
-            ],
-            5
-          ],
-          'circle-stroke-color': '#000',
-          'circle-stroke-width': 1,
-          // The feature-state dependent circle-color expression will render
-          // the color according to its magnitude when
-          // a feature's hover state is set to true
-          'circle-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            [
-              'interpolate',
-              ['linear'],
-              ['get', 'mag'],
-              1,
-              '#fff7ec',
-              1.5,
-              '#fee8c8',
-              2,
-              '#fdd49e',
-              2.5,
-              '#fdbb84',
-              3,
-              '#fc8d59',
-              3.5,
-              '#ef6548',
-              4.5,
-              '#d7301f',
-              6.5,
-              '#b30000',
-              8.5,
-              '#7f0000',
-              10.5,
-              '#000'
-            ],
-            '#000'
-          ]
+    window.Retool.subscribe(function (model) {
+      if (!model) {
+        return;
+      }
+      let boundarydata = {
+        lat: [],
+        lng: []
+      };
+
+      if (model.source_lon && model.source_lat) {
+        marker3.setLngLat([parseFloat(model.source_lon), parseFloat(model.source_lat)]);
+        marker3.addTo(map);
+        boundarydata.lat.push(parseFloat(model.source_lat));
+        boundarydata.lng.push(parseFloat(model.source_lon));
+      }
+      if (model.google_lon && model.google_lat) {
+        marker4.setLngLat([parseFloat(model.google_lon), parseFloat(model.google_lat)]);
+        marker4.addTo(map);
+        boundarydata.lat.push(parseFloat(model.google_lat));
+        boundarydata.lng.push(parseFloat(model.google_lon));
+      }
+      if (model.bing_lon && model.bing_lat) {
+        marker5.setLngLat([parseFloat(model.bing_lon), parseFloat(model.bing_lat)]);
+        marker5.addTo(map);
+        boundarydata.lat.push(parseFloat(model.bing_lat));
+        boundarydata.lng.push(parseFloat(model.bing_lon));
+      }
+
+      if (model.here_lon && model.here_lat) {
+        marker6.setLngLat([parseFloat(model.here_lon), parseFloat(model.here_lat)]);
+        marker6.addTo(map);
+        boundarydata.lat.push(parseFloat(model.here_lat));
+        boundarydata.lng.push(parseFloat(model.here_lon));
+      }
+
+      marker2.setLngLat([parseFloat(model.rp_lon), parseFloat(model.rp_lat)]);
+      marker2.addTo(map);
+
+      marker1.setLngLat([parseFloat(model.longitude), parseFloat(model.latitude)]);
+      marker1.addTo(map);
+      boundarydata.lat.push(parseFloat(model.latitude));
+      boundarydata.lng.push(parseFloat(model.longitude));
+
+      const prepGeojsonPoints = async (geojson) => {
+        // check if it is a FeatureCollection
+        if (geojson.type !== 'FeatureCollection') {
+          throw new Error(`Entered geojson is not a "FeatureCollection"`)
         }
-      });
-
-      let quakeID = null;
-
-      map.on('mousemove', 'earthquakes-viz', (event) => {
-        map.getCanvas().style.cursor = 'pointer';
-        // Set constants equal to the current feature's magnitude, location, and time
-        const quakeMagnitude = event.features[0].properties.mag;
-        const quakeLocation = event.features[0].properties.place;
-        const quakeDate = new Date(event.features[0].properties.time);
-
-        // Check whether features exist
-        if (event.features.length === 0) return;
-        // Display the magnitude, location, and time in the sidebar
-        magDisplay.textContent = quakeMagnitude;
-        locDisplay.textContent = quakeLocation;
-        dateDisplay.textContent = quakeDate;
-
-        // If quakeID for the hovered feature is not null,
-        // use removeFeatureState to reset to the default behavior
-        if (quakeID) {
-          map.removeFeatureState({
-            source: 'earthquakes',
-            id: quakeID
-          });
-        }
-
-        quakeID = event.features[0].id;
-
-        // When the mouse moves over the earthquakes-viz layer, update the
-        // feature state for the feature under the mouse
-        map.setFeatureState(
-          {
-            source: 'earthquakes',
-            id: quakeID
-          },
-          {
-            hover: true
+        // remove old legend
+        map.removeControl(legendControl);
+        // remove old layers & sources
+        for (const layerId of Object.keys(addedLayers)) {
+          if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
           }
-        );
-      });
+          if (map.getSource(layerId)) {
+            map.removeSource(layerId);
+          }
+        }
+
+        // reset feature index
+        if (featureIndex === undefined) {
+          featureIndex = 0;
+        }
+
+        // clear deleted layers
+        addedLayers = {};
+
+        // add new layers n sources
+        await geojson.features.forEach((feature) => {
+          if (feature.type === 'Feature' && feature.geometry.type === 'Point') {
+            // add source and layer for every feature
+            feature.properties.id = 0;
+            let layerId = 'geojson-feature-' + featureIndex;
+            map.addSource(layerId, {
+              type: 'geojson',
+              data: feature,
+              generateId: true,
+            });
+            map.addLayer({
+              id: layerId,
+              type: 'circle',
+              source: layerId,
+              paint: {
+                'circle-radius': 15,
+                'circle-color': ['case',
+                  ['boolean', ['feature-state', 'active'], false], '#7f0000',
+                  '#000'],
+              },
+              metadata: {
+                center: feature.geometry.coordinates,
+              },
+            });
+            const filteredProperties = filterProperties(feature.properties);
+            // add event to each layer to display popup with properties
+            map.on('click', layerId, (e) => {
+              const allSources = map?.getStyle().sources;
+              for (const sourceId in allSources) {
+                    if (allSources[sourceId].type = 'geojson') {
+                        map?.removeFeatureState({
+                            source: sourceId,
+                      });
+                  };
+              }; 
+              map.setFeatureState({
+                source: layerId,
+                id: e.features[0].id,
+                }, {
+                active: true
+                });
+            });
+            
+            // increment feature index and append added layer to obj
+            featureIndex++;
+            addedLayers[layerId] = feature.properties['tofix:category'];
+          }
+        });
+        legendControl = new MapboxLegendControl(addedLayers, {
+          showDefault: true,
+          showCheckbox: true,
+          onlyRendered: false,
+          reverseOrder: true,
+          zoomOnClick: true,
+        });
+        map.addControl(legendControl, 'top-right');
+      };
+
+
+      if (rowId !== model.row_id) {
+        var bbox = [
+          [Math.min(...boundarydata.lng), Math.min(...boundarydata.lat)],
+          [Math.max(...boundarydata.lng), Math.max(...boundarydata.lat)]
+        ];
+        map.fitBounds(bbox, {
+          padding: 100,
+          speed: 10,
+          maxZoom: 18.5
+        });
+        map.once('idle', () => {
+          prepGeojsonPoints(model.featureCollection);
+        });
+        rowId = model.row_id;
+        boundarydata = {
+          lat: [],
+          lng: []
+        };
+      }
     });
 
+    marker1.on('dragend', onDragEnd);
+    marker2.on('dragend', onDragEnd);
+    map.on('contextmenu', (e) => {
+      marker1.setLngLat(e.lngLat);
+      marker2.setLngLat(e.lngLat);
+      onDragEnd();
+    });
   </script>
 
 </body>

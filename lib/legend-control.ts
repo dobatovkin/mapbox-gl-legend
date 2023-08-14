@@ -240,14 +240,14 @@ export default class MapboxLegendControl implements IControl
                 });
             });
             label1.addEventListener('click', async () => {
-                const allSources: any = map?.getStyle().sources;
-                await allSources.forEach((source: any)=>{
-                     if (source.type = 'geojson') {
-                         map?.removeFeatureState({
-                             source: source,
+                const allSources = map?.getStyle().sources;
+                for (const sourceId in allSources) {
+                      if (allSources[sourceId].type = 'geojson') {
+                          map?.removeFeatureState({
+                              source: sourceId,
                         });
                     };
-                }); 
+                }; 
                 map?.setFeatureState({
                     source: String(layer.source),
                     id: 0,
