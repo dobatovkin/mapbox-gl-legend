@@ -235,19 +235,17 @@ export default class MapboxLegendControl implements IControl
         if (this.options.zoomOnClick) {
             label1.addEventListener('dblclick', function(){
                 // @ts-ignore
-                const flyCoordinates = [0,0];
                 map?.flyTo({
                     center: layer.metadata.center,
                 });
             });
             label1.addEventListener('click', (e) => {
                 map?.setFeatureState({
-                    source: layer.source,
+                    source: String(layer.source),
                     id: 0,
                 }, {
                     active: true,
-                })
-                console.log(layer.metadata)
+                });
             });
         }
         td2.appendChild(label1)
