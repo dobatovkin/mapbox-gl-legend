@@ -9,8 +9,10 @@
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
 
+  <!--  custom mapbox-gl-legend webpack   -->
   <link href='https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.css' rel='stylesheet' />
   <script src="https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -33,7 +35,12 @@
 
     #properties-menu {
       position: absolute;
-
+      background: #efefef;
+      padding: 10px;
+      font-family: 'Open Sans', sans-serif;
+      /* does not work for some reason */
+      font-size: 9pt !important;
+      bottom: 30px;
     }
 
     .coordinates {
@@ -51,8 +58,8 @@
     }
 
     .dot {
-      height: 30px;
-      width: 30px;
+      height: 20px;
+      width: 20px;
       background-color: red;
       border-radius: 50%;
       display: inline-block;
@@ -76,20 +83,38 @@
 
   <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoibWFuaW5nc2FtYmFsZSIsImEiOiJjamx3YTQya2ExNWdlM3FwM3Z1YWp2bHZrIn0.mk2emL4LkX_uwFPq7nHZsA';
-
-    function filterProperties(raw) {
-      const filtered = Object.keys(raw)
-        .filter((key) => key.startsWith('string'))
-        .reduce((obj, key) => {
-          return {
-            ...obj,
-            [key]: raw[key]
-          };
-        }, {});
+    /**
+    * @param {Array} geojson feature properties
+    */
+    function filterProperties(propertiesArray) {
+      filteredProperties = {}
+      for (property in propertiesArray) {
+        if (property.startsWith('string')) {
+          const propertyName = property.split(":")[1];
+          filteredProperties[propertyName] = propertiesArray[property];
+        }
+      }
+      return filteredProperties
     };
 
+    function convertJSONtoTable(json, tableContainerId) {
+      const tableContainer = document.getElementById(tableContainerId);
+      const table = document.createElement('table');
+      for (key in json) {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.textContent = key;
+        tr.appendChild(td1);
+        const td2 = document.createElement('td');
+        td2.textContent = json[key]
+        tr.appendChild(td2);
+        table.appendChild(tr);
+      }
+      tableContainer.appendChild(table);
+    }
+    //test markers https://colorbrewer2.org/#type=qualitative&scheme=Set3&n=12
+    const distinctColors = ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
 
-    //test markers https://colorbrewer2.org/#type=qualitative&scheme=Accent&n=3 ['#7fc97f','#beaed4','#fdc086']
     var rpMarker = document.createElement('span');
     rpMarker.className = "dot";
 
@@ -163,10 +188,12 @@
 
     var rowId;
     var featureIndex = 0;
+    var colorIndex = 0;
     var addedLayers = [];
     var legendControl;
 
     window.Retool.subscribe(function (model) {
+      // wait for model
       if (!model) {
         return;
       }
@@ -175,35 +202,38 @@
         lng: []
       };
 
+      // source feature location
       if (model.source_lon && model.source_lat) {
         marker3.setLngLat([parseFloat(model.source_lon), parseFloat(model.source_lat)]);
         marker3.addTo(map);
         boundarydata.lat.push(parseFloat(model.source_lat));
         boundarydata.lng.push(parseFloat(model.source_lon));
       }
+      // google
       if (model.google_lon && model.google_lat) {
         marker4.setLngLat([parseFloat(model.google_lon), parseFloat(model.google_lat)]);
         marker4.addTo(map);
         boundarydata.lat.push(parseFloat(model.google_lat));
         boundarydata.lng.push(parseFloat(model.google_lon));
       }
+      // bing
       if (model.bing_lon && model.bing_lat) {
         marker5.setLngLat([parseFloat(model.bing_lon), parseFloat(model.bing_lat)]);
         marker5.addTo(map);
         boundarydata.lat.push(parseFloat(model.bing_lat));
         boundarydata.lng.push(parseFloat(model.bing_lon));
       }
-
+      // here
       if (model.here_lon && model.here_lat) {
         marker6.setLngLat([parseFloat(model.here_lon), parseFloat(model.here_lat)]);
         marker6.addTo(map);
         boundarydata.lat.push(parseFloat(model.here_lat));
         boundarydata.lng.push(parseFloat(model.here_lon));
       }
-
+      // routable point (draggable)
       marker2.setLngLat([parseFloat(model.rp_lon), parseFloat(model.rp_lat)]);
       marker2.addTo(map);
-
+      // mapbox location (draggable)
       marker1.setLngLat([parseFloat(model.longitude), parseFloat(model.latitude)]);
       marker1.addTo(map);
       boundarydata.lat.push(parseFloat(model.latitude));
@@ -226,10 +256,17 @@
           }
         }
 
+        // remove old properties table
+        const oldProps = document.getElementById("properties-menu");
+        oldProps.textContent = '';
+
         // reset feature index
         if (featureIndex === undefined) {
           featureIndex = 0;
         }
+
+        // reset color index
+        colorIndex = 1;
 
         // clear deleted layers
         addedLayers = {};
@@ -251,12 +288,14 @@
               source: layerId,
               paint: {
                 'circle-radius': 15,
-                'circle-color': ['case',
-                  ['boolean', ['feature-state', 'active'], false], '#7f0000',
-                  '#000'],
+                'circle-color': distinctColors[colorIndex],
+                // ['case',
+                //   ['boolean', ['feature-state', 'active'], false], '#7f0000',
+                //   '#000'],
               },
               metadata: {
                 center: feature.geometry.coordinates,
+                properties: filterProperties(feature.properties),
               },
             });
             const filteredProperties = filterProperties(feature.properties);
@@ -264,21 +303,28 @@
             map.on('click', layerId, (e) => {
               const allSources = map?.getStyle().sources;
               for (const sourceId in allSources) {
-                    if (allSources[sourceId].type = 'geojson') {
-                        map?.removeFeatureState({
-                            source: sourceId,
-                      });
-                  };
-              }; 
+                if (allSources[sourceId].type = 'geojson') {
+                  map?.removeFeatureState({
+                    source: sourceId,
+                  });
+                };
+              };
               map.setFeatureState({
                 source: layerId,
                 id: e.features[0].id,
-                }, {
+              }, {
                 active: true
-                });
+              });
+              const layer = map.getLayer(layerId)
+              // remove old properties table
+              const oldProps = document.getElementById("properties-menu");
+              oldProps.textContent = '';
+
+              convertJSONtoTable(layer.metadata.properties, 'properties-menu');
             });
-            
+
             // increment feature index and append added layer to obj
+            colorIndex++;
             featureIndex++;
             addedLayers[layerId] = feature.properties['tofix:category'];
           }
@@ -307,6 +353,7 @@
         map.once('idle', () => {
           prepGeojsonPoints(model.featureCollection);
         });
+
         rowId = model.row_id;
         boundarydata = {
           lat: [],
