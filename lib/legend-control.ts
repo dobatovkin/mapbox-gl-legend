@@ -249,13 +249,14 @@ export default class MapboxLegendControl implements IControl {
         let label1 = document.createElement('label');
         label1.textContent = (this.targets && this.targets[layer.id]) ? this.targets[layer.id] : layer.id;
         if (this.options.zoomOnClick) {
-            label1.addEventListener('dblclick', function () {
+            label1.addEventListener('dblclick', () => {
                 // @ts-ignore
-                map?.flyTo({
+                map?.easeTo({
                     center: layer.metadata.center,
+                    zoom: 19,
                 });
             });
-            label1.addEventListener('click', async () => {
+            label1.addEventListener('click', () => {
                 const allSources = map?.getStyle().sources;
                 for (const sourceId in allSources) {
                     if (allSources[sourceId].type = 'geojson') {

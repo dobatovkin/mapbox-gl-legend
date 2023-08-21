@@ -28,19 +28,22 @@
 
     #menu {
       position: absolute;
-      background: #efefef;
+      backdrop-filter: blur(8px);
       padding: 10px;
       font-family: 'Open Sans', sans-serif;
     }
 
     #properties-menu {
       position: absolute;
-      background: #efefef;
+      backdrop-filter: blur(8px);
       padding: 10px;
       font-family: 'Open Sans', sans-serif;
-      /* does not work for some reason */
-      font-size: 9pt !important;
       bottom: 30px;
+    }
+
+    /* TODO: investigate why doesn't work while in parent scope*/
+    #properties-menu table {
+      font-size: 10pt;
     }
 
     .coordinates {
@@ -84,19 +87,20 @@
   <script>
     mapboxgl.accessToken = 'pk.eyJ1IjoibWFuaW5nc2FtYmFsZSIsImEiOiJjamx3YTQya2ExNWdlM3FwM3Z1YWp2bHZrIn0.mk2emL4LkX_uwFPq7nHZsA';
     /**
-    * @param {Array} geojson feature properties
+    * @param {Object} geojson feature properties
     */
-    function filterProperties(propertiesArray) {
+    function filterProperties(properties) {
       filteredProperties = {}
-      for (property in propertiesArray) {
+      for (property in properties) {
         if (property.startsWith('string')) {
           const propertyName = property.split(":")[1];
-          filteredProperties[propertyName] = propertiesArray[property];
+          filteredProperties[propertyName] = properties[property];
         }
       }
+      filteredProperties['category'] = properties['tofix:category'];
       return filteredProperties
     };
-
+    
     function convertJSONtoTable(json, tableContainerId) {
       const tableContainer = document.getElementById(tableContainerId);
       const table = document.createElement('table');
@@ -153,6 +157,16 @@
       scale: 0.7
     });
 
+    // update map position data in retool model on map move
+    function onMapMove() {
+      let mapCenter = map.getCenter();
+      mapCenter['z'] = map.getZoom();
+      window.Retool.modelUpdate({
+        mapCenter: mapCenter,
+      });
+    }
+
+    // update draggable markers position on drag end
     function onDragEnd() {
       const lngLat = marker1.getLngLat();
       const lngLat2 = marker2.getLngLat();
@@ -166,13 +180,15 @@
         source_lon: lngLat3.lng,
         debug: map.getStyle(),
       });
+      // looks like drag end should have no effect on the camera position
+      // onMapMove();
     }
 
+
     const map = new mapboxgl.Map({
-      container: 'map', // container ID
-      style: 'mapbox://styles/mapbox/streets-v12', // style URL
-      //center: [-2.81361, 36.77271], // starting position [lng, lat]
-      zoom: 16, // starting zoom
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v12',
+      zoom: 16,
       projection: 'mercator',
     });
 
@@ -186,11 +202,23 @@
       };
     }
 
-    var rowId;
-    var featureIndex = 0;
-    var colorIndex = 0;
-    var addedLayers = [];
-    var legendControl;
+    // the id of a current row in retool. change in it serves as trigger to update 
+    // the map's data
+    let rowId; 
+
+    // feature id for layers that are being added from featureCollection. 
+    // reserved in global scope so that it would be unique for each map load
+    let featureIndex = 0;
+
+    // the same as featureIndex, but it resets after rowId. 
+    // TODO: investigate the idea of choosing colors in a cycle
+    let colorIndex = 0;
+
+    // list of layers id, that were added from featureCollection
+    let addedLayers = [];
+
+    // hook to reference legend
+    let legendControl;
 
     window.Retool.subscribe(function (model) {
       // wait for model
@@ -239,7 +267,7 @@
       boundarydata.lat.push(parseFloat(model.latitude));
       boundarydata.lng.push(parseFloat(model.longitude));
 
-      const prepGeojsonPoints = async (geojson) => {
+      const prepGeojsonPoints = (geojson) => {
         // check if it is a FeatureCollection
         if (geojson.type !== 'FeatureCollection') {
           throw new Error(`Entered geojson is not a "FeatureCollection"`)
@@ -266,13 +294,14 @@
         }
 
         // reset color index
-        colorIndex = 1;
+        colorIndex = 0;
 
         // clear deleted layers
         addedLayers = {};
 
-        // add new layers n sources
-        await geojson.features.forEach((feature) => {
+        // add new layers & sources
+        geojson.features.forEach((feature) => {
+          // TODO: add support for line and polygon features 
           if (feature.type === 'Feature' && feature.geometry.type === 'Point') {
             // add source and layer for every feature
             feature.properties.id = 0;
@@ -289,9 +318,10 @@
               paint: {
                 'circle-radius': 15,
                 'circle-color': distinctColors[colorIndex],
-                // ['case',
-                //   ['boolean', ['feature-state', 'active'], false], '#7f0000',
-                //   '#000'],
+                'circle-stroke-color': '#000',
+                'circle-stroke-width': ['case',
+                  ['boolean', ['feature-state', 'active'], false], 3,
+                  0],
               },
               metadata: {
                 center: feature.geometry.coordinates,
@@ -364,11 +394,14 @@
 
     marker1.on('dragend', onDragEnd);
     marker2.on('dragend', onDragEnd);
+
     map.on('contextmenu', (e) => {
       marker1.setLngLat(e.lngLat);
       marker2.setLngLat(e.lngLat);
       onDragEnd();
     });
+
+    map.on('moveend', onMapMove)
   </script>
 
 </body>
