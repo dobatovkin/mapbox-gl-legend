@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Drag markers</title>
+  <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+  <link href="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.12.0/mapbox-gl.js"></script>
+
+  <!--  custom mapbox-gl-legend webpack   -->
+  <link href='https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.css' rel='stylesheet' />
+  <script src="https://dobatovkin.github.io/mapbox-gl-legend/docs/mapbox-gl-legend.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 100%;
+    }
+
+    #menu {
+      position: absolute;
+      backdrop-filter: blur(8px);
+      padding: 10px;
+      font-family: 'Open Sans', sans-serif;
+    }
+
+    #properties-menu {
+      position: absolute;
+      backdrop-filter: blur(8px);
+      padding: 10px;
+      font-family: 'Open Sans', sans-serif;
+      bottom: 30px;
+    }
+
+    /* TODO: investigate why doesn't work while in parent scope*/
+    #properties-menu table {
+      font-size: 10pt;
+    }
+
+    .coordinates {
+      background: rgba(0, 0, 0, 0.5);
+      color: #fff;
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      padding: 5px 10px;
+      margin: 0;
+      font-size: 11px;
+      line-height: 18px;
+      border-radius: 3px;
+      display: none;
+    }
+
+    .dot {
+      height: 20px;
+      width: 20px;
+      background-color: red;
+      border-radius: 50%;
+      display: inline-block;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="map"></div>
+  <div id="menu">
+    <input id="satellite-streets-v12" type="radio" name="rtoggle" value="satellite">
+    <label for="satellite-streets-v12">satellite</label>
+    <input id="streets-v12" type="radio" name="rtoggle" value="streets" checked="checked">
+    <label for="streets-v12">streets</label>
+  </div>
+
+  <div id="properties-menu"></div>
+
+  <pre id="coordinates" class="coordinates"></pre>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWFuaW5nc2FtYmFsZSIsImEiOiJjamx3YTQya2ExNWdlM3FwM3Z1YWp2bHZrIn0.mk2emL4LkX_uwFPq7nHZsA';
+    /**
+    * @param {Object} geojson feature properties
+    */
+    function filterProperties(properties) {
+      filteredProperties = {}
+      for (property in properties) {
+        if (property.startsWith('string')) {
+          const propertyName = property.split(":")[1];
+          filteredProperties[propertyName] = properties[property];
+        }
+      }
+      filteredProperties['category'] = properties['tofix:category'];
+      return filteredProperties
+    };
+    
+    function convertJSONtoTable(json, tableContainerId) {
+      const tableContainer = document.getElementById(tableContainerId);
+      const table = document.createElement('table');
+      for (key in json) {
+        const tr = document.createElement('tr');
+        const td1 = document.createElement('td');
+        td1.textContent = key;
+        tr.appendChild(td1);
+        const td2 = document.createElement('td');
+        td2.textContent = json[key]
+        tr.appendChild(td2);
+        table.appendChild(tr);
+      }
+      tableContainer.appendChild(table);
+    }
+    //test markers https://colorbrewer2.org/#type=qualitative&scheme=Set3&n=12
+    const distinctColors = ['#8dd3c7', '#ffffb3', '#bebada', '#fb8072', '#80b1d3', '#fdb462', '#b3de69', '#fccde5', '#d9d9d9', '#bc80bd', '#ccebc5', '#ffed6f'];
+
+    var rpMarker = document.createElement('span');
+    rpMarker.className = "dot";
+
+    var marker1 = new mapboxgl.Marker({
+      draggable: true,
+      color: "#3a59fa"
+    });
+
+    var marker2 = new mapboxgl.Marker({
+      draggable: true,
+      color: "blue",
+      element: rpMarker,
+    });
+
+    var marker3 = new mapboxgl.Marker({
+      draggable: false,
+      color: "gray",
+      scale: 1
+    });
+
+    var marker4 = new mapboxgl.Marker({
+      draggable: false,
+      color: "green",
+      scale: 0.7
+    });
+
+    var marker5 = new mapboxgl.Marker({
+      draggable: false,
+      color: "yellow",
+      scale: 0.7
+    });
+
+    var marker6 = new mapboxgl.Marker({
+      draggable: false,
+      color: "",
+      scale: 0.7
+    });
+
+    // update map position data in retool model on map move
+    function onMapMove() {
+      let mapCenter = map.getCenter();
+      mapCenter['z'] = map.getZoom();
+      window.Retool.modelUpdate({
+        mapCenter: mapCenter,
+      });
+    }
+
+    // update draggable markers position on drag end
+    function onDragEnd() {
+      const lngLat = marker1.getLngLat();
+      const lngLat2 = marker2.getLngLat();
+      const lngLat3 = marker3.getLngLat();
+      window.Retool.modelUpdate({
+        latitude: lngLat.lat,
+        longitude: lngLat.lng,
+        rp_lat: lngLat2.lat,
+        rp_lon: lngLat2.lng,
+        source_lat: lngLat3.lat,
+        source_lon: lngLat3.lng,
+        debug: map.getStyle(),
+      });
+      // looks like drag end should have no effect on the camera position
+      // onMapMove();
+    }
+
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v12',
+      zoom: 16,
+      projection: 'mercator',
+    });
+
+    const layerList = document.getElementById('menu');
+    const inputs = layerList.getElementsByTagName('input');
+
+    for (const input of inputs) {
+      input.onclick = (layer) => {
+        const layerId = layer.target.id;
+        map.setStyle('mapbox://styles/mapbox/' + layerId);
+      };
+    }
+
+    // the id of a current row in retool. change in it serves as trigger to update 
+    // the map's data
+    let rowId; 
+
+    // feature id for layers that are being added from featureCollection. 
+    // reserved in global scope so that it would be unique for each map load
+    let featureIndex = 0;
+
+    // the same as featureIndex, but it resets after rowId. 
+    // TODO: investigate the idea of choosing colors in a cycle
+    let colorIndex = 0;
+
+    // list of layers id, that were added from featureCollection
+    let addedLayers = [];
+
+    // hook to reference legend
+    let legendControl;
+
+    window.Retool.subscribe(function (model) {
+      // wait for model
+      if (!model) {
+        return;
+      }
+      let boundarydata = {
+        lat: [],
+        lng: []
+      };
+
+      // source feature location
+      if (model.source_lon && model.source_lat) {
+        marker3.setLngLat([parseFloat(model.source_lon), parseFloat(model.source_lat)]);
+        marker3.addTo(map);
+        boundarydata.lat.push(parseFloat(model.source_lat));
+        boundarydata.lng.push(parseFloat(model.source_lon));
+      }
+      // google
+      if (model.google_lon && model.google_lat) {
+        marker4.setLngLat([parseFloat(model.google_lon), parseFloat(model.google_lat)]);
+        marker4.addTo(map);
+        boundarydata.lat.push(parseFloat(model.google_lat));
+        boundarydata.lng.push(parseFloat(model.google_lon));
+      }
+      // bing
+      if (model.bing_lon && model.bing_lat) {
+        marker5.setLngLat([parseFloat(model.bing_lon), parseFloat(model.bing_lat)]);
+        marker5.addTo(map);
+        boundarydata.lat.push(parseFloat(model.bing_lat));
+        boundarydata.lng.push(parseFloat(model.bing_lon));
+      }
+      // here
+      if (model.here_lon && model.here_lat) {
+        marker6.setLngLat([parseFloat(model.here_lon), parseFloat(model.here_lat)]);
+        marker6.addTo(map);
+        boundarydata.lat.push(parseFloat(model.here_lat));
+        boundarydata.lng.push(parseFloat(model.here_lon));
+      }
+      // routable point (draggable)
+      marker2.setLngLat([parseFloat(model.rp_lon), parseFloat(model.rp_lat)]);
+      marker2.addTo(map);
+      // mapbox location (draggable)
+      marker1.setLngLat([parseFloat(model.longitude), parseFloat(model.latitude)]);
+      marker1.addTo(map);
+      boundarydata.lat.push(parseFloat(model.latitude));
+      boundarydata.lng.push(parseFloat(model.longitude));
+
+      const prepGeojsonPoints = (geojson) => {
+        // check if it is a FeatureCollection
+        if (geojson.type !== 'FeatureCollection') {
+          throw new Error(`Entered geojson is not a "FeatureCollection"`)
+        }
+        // remove old legend
+        map.removeControl(legendControl);
+        // remove old layers & sources
+        for (const layerId of Object.keys(addedLayers)) {
+          if (map.getLayer(layerId)) {
+            map.removeLayer(layerId);
+          }
+          if (map.getSource(layerId)) {
+            map.removeSource(layerId);
+          }
+        }
+
+        // remove old properties table
+        const oldProps = document.getElementById("properties-menu");
+        oldProps.textContent = '';
+
+        // reset feature index
+        if (featureIndex === undefined) {
+          featureIndex = 0;
+        }
+
+        // reset color index
+        colorIndex = 0;
+
+        // clear deleted layers
+        addedLayers = {};
+
+        // add new layers & sources
+        geojson.features.forEach((feature) => {
+          // TODO: add support for line and polygon features 
+          if (feature.type === 'Feature' && feature.geometry.type === 'Point') {
+            // add source and layer for every feature
+            feature.properties.id = 0;
+            let layerId = 'geojson-feature-' + featureIndex;
+            map.addSource(layerId, {
+              type: 'geojson',
+              data: feature,
+              generateId: true,
+            });
+            map.addLayer({
+              id: layerId,
+              type: 'circle',
+              source: layerId,
+              paint: {
+                'circle-radius': 15,
+                'circle-color': distinctColors[colorIndex],
+                'circle-stroke-color': '#000',
+                'circle-stroke-width': ['case',
+                  ['boolean', ['feature-state', 'active'], false], 3,
+                  0],
+              },
+              metadata: {
+                center: feature.geometry.coordinates,
+                properties: filterProperties(feature.properties),
+              },
+            });
+            const filteredProperties = filterProperties(feature.properties);
+            // add event to each layer to display popup with properties
+            map.on('click', layerId, (e) => {
+              const allSources = map?.getStyle().sources;
+              for (const sourceId in allSources) {
+                if (allSources[sourceId].type = 'geojson') {
+                  map?.removeFeatureState({
+                    source: sourceId,
+                  });
+                };
+              };
+              map.setFeatureState({
+                source: layerId,
+                id: e.features[0].id,
+              }, {
+                active: true
+              });
+              const layer = map.getLayer(layerId)
+              // remove old properties table
+              const oldProps = document.getElementById("properties-menu");
+              oldProps.textContent = '';
+
+              convertJSONtoTable(layer.metadata.properties, 'properties-menu');
+            });
+
+            // increment feature index and append added layer to obj
+            colorIndex++;
+            featureIndex++;
+            addedLayers[layerId] = feature.properties['tofix:category'];
+          }
+        });
+        legendControl = new MapboxLegendControl(addedLayers, {
+          showDefault: true,
+          showCheckbox: true,
+          onlyRendered: false,
+          reverseOrder: true,
+          zoomOnClick: true,
+        });
+        map.addControl(legendControl, 'top-right');
+      };
+
+
+      if (rowId !== model.row_id) {
+        var bbox = [
+          [Math.min(...boundarydata.lng), Math.min(...boundarydata.lat)],
+          [Math.max(...boundarydata.lng), Math.max(...boundarydata.lat)]
+        ];
+        map.fitBounds(bbox, {
+          padding: 100,
+          speed: 10,
+          maxZoom: 18.5
+        });
+        map.once('idle', () => {
+          prepGeojsonPoints(model.featureCollection);
+        });
+
+        rowId = model.row_id;
+        boundarydata = {
+          lat: [],
+          lng: []
+        };
+      }
+    });
+
+    marker1.on('dragend', onDragEnd);
+    marker2.on('dragend', onDragEnd);
+
+    map.on('contextmenu', (e) => {
+      marker1.setLngLat(e.lngLat);
+      marker2.setLngLat(e.lngLat);
+      onDragEnd();
+    });
+
+    map.on('moveend', onMapMove)
+  </script>
+
+</body>
+
+</html>
